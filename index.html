@@ -1,0 +1,949 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPU Scheduling Simulator</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f3f5fa;
+  color:#202638;
+}
+header{
+  background:#18233d;
+  color:white;
+  padding:25px;
+  text-align:center;
+}
+header h1{margin:0 0 8px}
+header p{margin:0;color:#cbd5e1}
+.container{max-width:1150px;margin:25px auto;padding:0 16px}
+.card{
+  background:white;
+  padding:22px;
+  border-radius:12px;
+  margin-bottom:20px;
+  box-shadow:0 3px 14px rgba(0,0,0,.06);
+}
+h2{margin-top:0;color:#263b68}
+h3{color:#344b78}
+input,select,button{
+  padding:10px;
+  border:1px solid #ccd3df;
+  border-radius:7px;
+  font-size:14px;
+}
+input{width:100%}
+button{
+  cursor:pointer;
+  border:0;
+  background:#3157a4;
+  color:white;
+  font-weight:bold;
+}
+button:hover{background:#24447f}
+button.secondary{background:#64748b}
+button.danger{background:#c24141}
+button.success{background:#16845b}
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:12px;
+  align-items:end;
+}
+.field label{
+  display:block;
+  margin-bottom:6px;
+  font-size:13px;
+  font-weight:bold;
+}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{
+  border:1px solid #e1e5ec;
+  padding:10px;
+  text-align:center;
+  font-size:14px;
+}
+th{background:#edf1f8}
+.empty{text-align:center;color:#7b8495;padding:18px}
+.hidden{display:none!important}
+.algorithm-info{
+  background:#eef4ff;
+  border-left:4px solid #3157a4;
+  padding:15px;
+  border-radius:7px;
+  line-height:1.6;
+}
+.parameter-row{margin-top:15px}
+.gantt{
+  display:flex;
+  overflow-x:auto;
+  padding:15px 5px 25px;
+  align-items:stretch;
+}
+.gantt-item{
+  min-width:65px;
+  height:58px;
+  border:2px solid white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color:white;
+  font-weight:bold;
+  position:relative;
+  flex-shrink:0;
+  border-radius:5px;
+}
+.gantt-item small{
+  position:absolute;
+  bottom:-23px;
+  color:#27334a;
+  font-weight:normal;
+}
+.gantt-item .end{
+  right:-5px;
+}
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;
+}
+.metric{
+  background:#f1f5fb;
+  padding:15px;
+  border-radius:9px;
+  text-align:center;
+}
+.metric strong{display:block;font-size:23px;color:#3157a4;margin-top:5px}
+.log{
+  background:#172033;
+  color:#d9e5ff;
+  border-radius:8px;
+  padding:15px;
+  min-height:80px;
+  max-height:260px;
+  overflow:auto;
+  font-family:monospace;
+  line-height:1.7;
+  white-space:pre-wrap;
+}
+.manual h3{border-bottom:1px solid #e3e7ef;padding-bottom:7px}
+.manual p,.manual li{line-height:1.7}
+.manual pre{
+  background:#172033;
+  color:#e1eaff;
+  padding:15px;
+  overflow:auto;
+  border-radius:8px;
+  line-height:1.5;
+}
+.note{font-size:13px;color:#64748b}
+footer{text-align:center;padding:20px;color:#788397}
+@media(max-width:600px){
+  .card{padding:15px}
+  th,td{padding:7px;font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CPU Scheduling Simulator</h1>
+  <p>Operating Systems Laboratory | Interactive Scheduling Demonstration</p>
+</header>
+
+<main class="container">
+
+<section class="card">
+  <h2>1. Process Input</h2>
+  <div class="form-grid">
+    <div class="field">
+      <label for="pid">Process ID</label>
+      <input id="pid" placeholder="P1">
+    </div>
+    <div class="field">
+      <label for="arrival">Arrival Time</label>
+      <input id="arrival" type="number" min="0" value="0">
+    </div>
+    <div class="field">
+      <label for="burst">Burst Time</label>
+      <input id="burst" type="number" min="1" value="5">
+    </div>
+    <div class="field">
+      <button onclick="addProcess()">Add Process</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="secondary" onclick="loadSample()">Load Sample</button>
+    <button class="danger" onclick="clearProcesses()">Clear All</button>
+  </div>
+
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Process</th>
+          <th>Arrival Time</th>
+          <th>Burst Time</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="processTable">
+        <tr><td colspan="4" class="empty">No processes added yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>2. Select Scheduling Algorithm</h2>
+  <div class="form-grid">
+    <div class="field">
+      <label for="algorithm">Scheduling Algorithm</label>
+      <select id="algorithm" onchange="changeAlgorithm()">
+        <option value="FCFS">First Come First Serve (FCFS)</option>
+        <option value="SJF">Shortest Job First (SJF)</option>
+        <option value="RR">Round Robin (RR)</option>
+        <option value="MLFQ">Multilevel Feedback Queue (MLFQ)</option>
+      </select>
+    </div>
+    <div class="field" id="quantumField" class="hidden">
+      <label for="quantum">Time Quantum</label>
+      <input id="quantum" type="number" min="1" value="2">
+    </div>
+    <div class="field hidden" id="q1Field">
+      <label for="q1">MLFQ Queue 1 Quantum</label>
+      <input id="q1" type="number" min="1" value="2">
+    </div>
+    <div class="field hidden" id="q2Field">
+      <label for="q2">MLFQ Queue 2 Quantum</label>
+      <input id="q2" type="number" min="1" value="4">
+    </div>
+  </div>
+
+  <div class="algorithm-info" id="algorithmInfo"></div>
+
+  <div class="actions">
+    <button class="success" onclick="runSimulation()">Run Simulation</button>
+  </div>
+</section>
+
+<section class="card">
+  <h2>3. Gantt Chart</h2>
+  <div id="gantt" class="empty">Run a simulation to display the Gantt chart.</div>
+</section>
+
+<section class="card">
+  <h2>4. Scheduling Results</h2>
+  <div class="metrics">
+    <div class="metric">Average Waiting Time<strong id="avgWT">-</strong></div>
+    <div class="metric">Average Turnaround Time<strong id="avgTAT">-</strong></div>
+    <div class="metric">Total Execution Time<strong id="totalTime">-</strong></div>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Process</th>
+          <th>AT</th>
+          <th>BT</th>
+          <th>CT</th>
+          <th>TAT</th>
+          <th>WT</th>
+        </tr>
+      </thead>
+      <tbody id="resultTable">
+        <tr><td colspan="6" class="empty">No results available.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>5. Operation Log</h2>
+  <div id="operationLog" class="log">Waiting for simulation...</div>
+</section>
+
+<section class="card manual">
+  <h2>6. Lab Manual</h2>
+  <p class="note">The lab manual below updates automatically when you select a scheduling algorithm.</p>
+  <div id="labManual"></div>
+</section>
+
+</main>
+
+<footer>CPU Scheduling Simulator | Operating Systems Laboratory</footer>
+
+<script>
+let processes = [];
+let results = [];
+let timeline = [];
+
+const colors = [
+  "#3157a4","#16845b","#a45b31","#8755a8",
+  "#bd8b23","#287d91","#b34c6a","#64748b"
+];
+
+const descriptions = {
+  FCFS: {
+    title:"First Come First Serve (FCFS)",
+    text:"FCFS is a non-preemptive scheduling algorithm. The process that arrives first gets the CPU first. Once execution starts, the process continues until it finishes.",
+    points:[
+      "Simple and easy to implement.",
+      "Processes execute in arrival order.",
+      "Non-preemptive scheduling.",
+      "May cause the convoy effect."
+    ]
+  },
+  SJF: {
+    title:"Shortest Job First (SJF)",
+    text:"Non-preemptive SJF selects the process with the smallest burst time from the processes that have already arrived. The selected process runs until completion.",
+    points:[
+      "Selects the shortest available CPU burst.",
+      "Non-preemptive in this simulator.",
+      "Can reduce average waiting time.",
+      "Long processes may experience starvation."
+    ]
+  },
+  RR: {
+    title:"Round Robin (RR)",
+    text:"Round Robin gives each ready process a fixed amount of CPU time called the time quantum. If a process is unfinished, it returns to the ready queue.",
+    points:[
+      "Preemptive scheduling algorithm.",
+      "Each process gets a time slice.",
+      "Suitable for time-sharing systems.",
+      "Performance depends on time quantum."
+    ]
+  },
+  MLFQ: {
+    title:"Multilevel Feedback Queue (MLFQ)",
+    text:"MLFQ uses multiple priority queues. This simulator uses three queues. New processes enter Queue 1. Unfinished processes move to lower-priority queues.",
+    points:[
+      "Uses multiple priority queues.",
+      "New processes enter the highest-priority queue.",
+      "Unfinished processes are demoted.",
+      "This is a simplified MLFQ implementation."
+    ]
+  }
+};
+
+function safeText(value){
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[char]);
+}
+
+function addProcess(){
+  const id = document.getElementById("pid").value.trim();
+  const at = Number(document.getElementById("arrival").value);
+  const bt = Number(document.getElementById("burst").value);
+
+  if(!id){
+    alert("Enter a Process ID.");
+    return;
+  }
+  if(processes.some(p => p.id.toLowerCase() === id.toLowerCase())){
+    alert("Process ID already exists.");
+    return;
+  }
+  if(!Number.isInteger(at) || at < 0 || !Number.isInteger(bt) || bt <= 0){
+    alert("Arrival time must be 0 or greater and burst time must be a positive integer.");
+    return;
+  }
+
+  processes.push({id,at,bt});
+  renderProcesses();
+  resetResults();
+  document.getElementById("pid").value="";
+  document.getElementById("arrival").value="0";
+  document.getElementById("burst").value="5";
+}
+
+function removeProcess(id){
+  processes = processes.filter(p => p.id !== id);
+  renderProcesses();
+  resetResults();
+}
+
+function renderProcesses(){
+  const body = document.getElementById("processTable");
+  if(!processes.length){
+    body.innerHTML='<tr><td colspan="4" class="empty">No processes added yet.</td></tr>';
+    return;
+  }
+
+  body.innerHTML=processes.map(p=>`
+    <tr>
+      <td>${safeText(p.id)}</td>
+      <td>${p.at}</td>
+      <td>${p.bt}</td>
+      <td><button class="danger" onclick="removeProcess(${JSON.stringify(p.id).replace(/</g,"\\u003c")})">Remove</button></td>
+    </tr>
+  `).join("");
+}
+
+function loadSample(){
+  processes=[
+    {id:"P1",at:0,bt:5},
+    {id:"P2",at:1,bt:3},
+    {id:"P3",at:2,bt:8},
+    {id:"P4",at:3,bt:6}
+  ];
+  renderProcesses();
+  resetResults();
+}
+
+function clearProcesses(){
+  processes=[];
+  renderProcesses();
+  resetResults();
+  document.getElementById("operationLog").textContent="Process list cleared.";
+}
+
+function resetResults(){
+  results=[];
+  timeline=[];
+  document.getElementById("gantt").innerHTML='<div class="empty">Run a simulation to display the Gantt chart.</div>';
+  document.getElementById("resultTable").innerHTML='<tr><td colspan="6" class="empty">No results available.</td></tr>';
+  document.getElementById("avgWT").textContent="-";
+  document.getElementById("avgTAT").textContent="-";
+  document.getElementById("totalTime").textContent="-";
+}
+
+function changeAlgorithm(){
+  const algorithm=document.getElementById("algorithm").value;
+
+  document.getElementById("quantumField").classList.toggle("hidden",algorithm!=="RR");
+  document.getElementById("q1Field").classList.toggle("hidden",algorithm!=="MLFQ");
+  document.getElementById("q2Field").classList.toggle("hidden",algorithm!=="MLFQ");
+
+  const data=descriptions[algorithm];
+  document.getElementById("algorithmInfo").innerHTML=`
+    <h3>${data.title}</h3>
+    <p>${data.text}</p>
+    <strong>Important characteristics:</strong>
+    <ul>${data.points.map(x=>`<li>${x}</li>`).join("")}</ul>
+  `;
+
+  resetResults();
+  document.getElementById("operationLog").textContent=
+    algorithm+" selected. Run the simulation to see its execution.";
+  renderLabManual();
+}
+
+function addSegment(pid,start,end){
+  if(end<=start)return;
+  timeline.push({pid,start,end});
+}
+
+function runFCFS(){
+  const list=processes.slice().sort((a,b)=>a.at-b.at);
+  let time=0;
+  const log=[];
+
+  list.forEach(p=>{
+    if(time<p.at){
+      log.push(`CPU is idle from ${time} to ${p.at}.`);
+      time=p.at;
+    }
+    const start=time;
+    time+=p.bt;
+    addSegment(p.id,start,time);
+    results.push({...p,ct:time});
+    log.push(`${p.id} arrives at ${p.at} and executes from ${start} to ${time}.`);
+    log.push(`${p.id} completes at time ${time}.`);
+  });
+  return log;
+}
+
+function runSJF(){
+  let remaining=processes.map(p=>({...p,done:false}));
+  let time=0,completed=0;
+  const log=[];
+
+  while(completed<remaining.length){
+    const available=remaining.filter(p=>!p.done && p.at<=time);
+    if(!available.length){
+      const next=Math.min(...remaining.filter(p=>!p.done).map(p=>p.at));
+      log.push(`CPU is idle from ${time} to ${next}.`);
+      time=next;
+      continue;
+    }
+
+    available.sort((a,b)=>a.bt-b.bt || a.at-b.at);
+    const p=available[0];
+    const start=time;
+    time+=p.bt;
+    addSegment(p.id,start,time);
+    p.done=true;
+    completed++;
+    results.push({...p,ct:time});
+    log.push(`${p.id} is selected because it has the shortest available burst time.`);
+    log.push(`${p.id} executes from ${start} to ${time} and completes.`);
+  }
+  return log;
+}
+
+function runRR(){
+  const quantum=Number(document.getElementById("quantum").value);
+  if(!Number.isInteger(quantum)||quantum<=0)throw Error("Enter a valid positive integer time quantum.");
+
+  const list=processes.map(p=>({...p,remaining:p.bt,added:false}));
+  const queue=[];
+  let time=0,completed=0;
+  const log=[];
+
+  while(completed<list.length){
+    list.filter(p=>!p.added && p.at<=time)
+      .sort((a,b)=>a.at-b.at)
+      .forEach(p=>{p.added=true;queue.push(p);log.push(`${p.id} enters the ready queue.`);});
+
+    if(!queue.length){
+      const next=Math.min(...list.filter(p=>p.remaining>0).map(p=>p.at));
+      log.push(`CPU is idle from ${time} to ${next}.`);
+      time=next;
+      continue;
+    }
+
+    const p=queue.shift();
+    const start=time;
+    const run=Math.min(quantum,p.remaining);
+    time+=run;
+    p.remaining-=run;
+    addSegment(p.id,start,time);
+    log.push(`${p.id} gets the CPU from ${start} to ${time}.`);
+
+    list.filter(x=>!x.added && x.at<=time)
+      .sort((a,b)=>a.at-b.at)
+      .forEach(x=>{x.added=true;queue.push(x);log.push(`${x.id} enters the ready queue.`);});
+
+    if(p.remaining===0){
+      completed++;
+      results.push({...p,ct:time});
+      log.push(`${p.id} completes at time ${time}.`);
+    }else{
+      queue.push(p);
+      log.push(`${p.id} has ${p.remaining} units remaining and returns to the ready queue.`);
+    }
+  }
+  return log;
+}
+
+function runMLFQ(){
+  const q1=Number(document.getElementById("q1").value);
+  const q2=Number(document.getElementById("q2").value);
+  if(!Number.isInteger(q1)||q1<=0||!Number.isInteger(q2)||q2<=0){
+    throw Error("Enter valid positive integer queue quantums.");
+  }
+
+  const list=processes.map(p=>({...p,remaining:p.bt,queue:1,added:false}));
+  const queues=[[],[],[]];
+  let time=0,completed=0;
+  const log=[];
+
+  while(completed<list.length){
+    list.filter(p=>!p.added && p.at<=time)
+      .sort((a,b)=>a.at-b.at)
+      .forEach(p=>{
+        p.added=true;
+        queues[0].push(p);
+        log.push(`${p.id} enters highest-priority Queue 1.`);
+      });
+
+    let queueIndex=queues.findIndex(q=>q.length>0);
+
+    if(queueIndex===-1){
+      const next=Math.min(...list.filter(p=>p.remaining>0).map(p=>p.at));
+      log.push(`CPU is idle from ${time} to ${next}.`);
+      time=next;
+      continue;
+    }
+
+    const p=queues[queueIndex].shift();
+    const quantum=queueIndex===0?q1:(queueIndex===1?q2:p.remaining);
+    const start=time;
+    const run=Math.min(quantum,p.remaining);
+    time+=run;
+    p.remaining-=run;
+    addSegment(p.id,start,time);
+
+    log.push(`${p.id} executes in Queue ${queueIndex+1} from ${start} to ${time}.`);
+
+    list.filter(x=>!x.added && x.at<=time)
+      .sort((a,b)=>a.at-b.at)
+      .forEach(x=>{
+        x.added=true;
+        queues[0].push(x);
+        log.push(`${x.id} enters Queue 1.`);
+      });
+
+    if(p.remaining===0){
+      completed++;
+      results.push({...p,ct:time});
+      log.push(`${p.id} completes at time ${time}.`);
+    }else{
+      p.queue=Math.min(p.queue+1,3);
+      queues[p.queue-1].push(p);
+      log.push(`${p.id} is demoted to Queue ${p.queue}. Remaining burst time: ${p.remaining}.`);
+    }
+  }
+  return log;
+}
+
+function runSimulation(){
+  if(!processes.length){
+    alert("Please add at least one process.");
+    return;
+  }
+
+  resetResults();
+  const algorithm=document.getElementById("algorithm").value;
+  let log=[];
+
+  try{
+    if(algorithm==="FCFS")log=runFCFS();
+    if(algorithm==="SJF")log=runSJF();
+    if(algorithm==="RR")log=runRR();
+    if(algorithm==="MLFQ")log=runMLFQ();
+
+    calculateMetrics();
+    renderGantt();
+    document.getElementById("operationLog").textContent=
+      `Selected algorithm: ${algorithm}\n\n`+log.join("\n");
+  }catch(error){
+    resetResults();
+    alert(error.message);
+  }
+}
+
+function calculateMetrics(){
+  let totalWT=0,totalTAT=0;
+  results.sort((a,b)=>a.id.localeCompare(b.id));
+
+  const body=document.getElementById("resultTable");
+  body.innerHTML=results.map(p=>{
+    const tat=p.ct-p.at;
+    const wt=tat-p.bt;
+    totalTAT+=tat;
+    totalWT+=wt;
+    return `<tr>
+      <td>${safeText(p.id)}</td>
+      <td>${p.at}</td>
+      <td>${p.bt}</td>
+      <td>${p.ct}</td>
+      <td>${tat}</td>
+      <td>${wt}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("avgWT").textContent=(totalWT/results.length).toFixed(2);
+  document.getElementById("avgTAT").textContent=(totalTAT/results.length).toFixed(2);
+  document.getElementById("totalTime").textContent=Math.max(...timeline.map(x=>x.end));
+}
+
+function renderGantt(){
+  const chart=document.getElementById("gantt");
+  const ids=[...new Set(timeline.map(x=>x.pid))];
+  const colorMap={};
+  ids.forEach((id,i)=>colorMap[id]=colors[i%colors.length]);
+
+  chart.innerHTML='<div class="gantt">'+timeline.map((item,i)=>`
+    <div class="gantt-item"
+      style="width:${Math.max(65,(item.end-item.start)*65)}px;background:${colorMap[item.pid]}">
+      ${safeText(item.pid)}
+      <small>${item.start}</small>
+      <small class="end">${item.end}</small>
+    </div>
+  `).join("")+'</div>';
+}
+
+const manualData={
+FCFS:{
+aim:"To implement and simulate the First Come First Serve CPU scheduling algorithm and calculate completion time, turnaround time and waiting time.",
+theory:"FCFS is a non-preemptive CPU scheduling algorithm. The process that arrives first is executed first. The ready queue follows the FIFO principle.",
+steps:["Start the program.","Read the number of processes.","Read arrival time and burst time of each process.","Arrange processes in increasing order of arrival time.","Execute each process until completion.","Calculate CT, TAT and WT.","Display the scheduling results."],
+pseudo:`Sort processes by arrival time.
+time = 0
+For each process:
+    If time < arrival time:
+        time = arrival time
+    time = time + burst time
+    CT = time
+    TAT = CT - AT
+    WT = TAT - BT`,
+code:`#include <stdio.h>
+int main() {
+    int n, i, j, at[20], bt[20], ct[20], tat[20], wt[20];
+    int temp, time = 0;
+    float avgWT = 0, avgTAT = 0;
+
+    printf("Enter number of processes: ");
+    scanf("%d", &n);
+
+    for(i=0;i<n;i++) {
+        printf("Enter AT and BT: ");
+        scanf("%d%d", &at[i], &bt[i]);
+    }
+
+    for(i=0;i<n-1;i++)
+        for(j=i+1;j<n;j++)
+            if(at[i] > at[j]) {
+                temp=at[i]; at[i]=at[j]; at[j]=temp;
+                temp=bt[i]; bt[i]=bt[j]; bt[j]=temp;
+            }
+
+    for(i=0;i<n;i++) {
+        if(time < at[i]) time=at[i];
+        time += bt[i];
+        ct[i]=time;
+        tat[i]=ct[i]-at[i];
+        wt[i]=tat[i]-bt[i];
+        avgWT += wt[i];
+        avgTAT += tat[i];
+    }
+
+    printf("\\nCT\\tTAT\\tWT\\n");
+    for(i=0;i<n;i++)
+        printf("%d\\t%d\\t%d\\n",ct[i],tat[i],wt[i]);
+
+    printf("Average WT = %.2f\\n",avgWT/n);
+    printf("Average TAT = %.2f\\n",avgTAT/n);
+    return 0;
+}`,
+faq:[
+["What is FCFS?","FCFS is a scheduling algorithm in which the process arriving first gets the CPU first."],
+["Is FCFS preemptive?","No. FCFS is non-preemptive."],
+["What is the main disadvantage?","It may cause the convoy effect and increase waiting time."]
+]
+},
+SJF:{
+aim:"To implement non-preemptive Shortest Job First scheduling and calculate completion time, turnaround time and waiting time.",
+theory:"SJF selects the process with the smallest burst time among all processes that have arrived and are ready. In this experiment, the selected process runs until completion.",
+steps:["Start the program.","Read process arrival and burst times.","Find processes that have arrived and are not completed.","Select the process with the smallest burst time.","Execute the selected process completely.","Repeat until all processes finish.","Calculate and display CT, TAT and WT."],
+pseudo:`time = 0
+completed = 0
+While completed < number of processes:
+    Find arrived and unfinished processes
+    If none are available:
+        Move time to next arrival
+    Else:
+        Select process with minimum burst time
+        Execute it completely
+        Calculate CT, TAT and WT
+        Mark process completed`,
+code:`#include <stdio.h>
+int main() {
+    int n,i,time=0,done=0;
+    int at[20],bt[20],ct[20],tat[20],wt[20],finished[20]={0};
+    float avgWT=0,avgTAT=0;
+
+    printf("Enter number of processes: ");
+    scanf("%d",&n);
+
+    for(i=0;i<n;i++) {
+        printf("Enter AT and BT: ");
+        scanf("%d%d",&at[i],&bt[i]);
+    }
+
+    while(done<n) {
+        int selected=-1;
+        for(i=0;i<n;i++) {
+            if(!finished[i] && at[i]<=time) {
+                if(selected==-1 || bt[i]<bt[selected])
+                    selected=i;
+            }
+        }
+
+        if(selected==-1) {
+            time++;
+            continue;
+        }
+
+        time += bt[selected];
+        ct[selected]=time;
+        tat[selected]=ct[selected]-at[selected];
+        wt[selected]=tat[selected]-bt[selected];
+        finished[selected]=1;
+        done++;
+    }
+
+    printf("\\nCT\\tTAT\\tWT\\n");
+    for(i=0;i<n;i++) {
+        printf("%d\\t%d\\t%d\\n",ct[i],tat[i],wt[i]);
+        avgWT+=wt[i];
+        avgTAT+=tat[i];
+    }
+
+    printf("Average WT = %.2f\\n",avgWT/n);
+    printf("Average TAT = %.2f\\n",avgTAT/n);
+    return 0;
+}`,
+faq:[
+["What is SJF?","SJF selects the available process with the smallest CPU burst time."],
+["Is this implementation preemptive?","No. This simulator uses non-preemptive SJF."],
+["What is starvation?","A long process may wait for a long time if shorter processes keep arriving."]
+]
+},
+RR:{
+aim:"To implement Round Robin CPU scheduling using a time quantum and calculate completion time, turnaround time and waiting time.",
+theory:"Round Robin is a preemptive scheduling algorithm. Each process receives CPU time for a fixed time quantum. If it is not completed, it is placed at the end of the ready queue.",
+steps:["Start the program.","Read the processes and their arrival and burst times.","Read the time quantum.","Insert arrived processes into the ready queue.","Execute the front process for one quantum or its remaining burst time.","If unfinished, return it to the queue.","Repeat until all processes complete.","Calculate CT, TAT and WT."],
+pseudo:`Read time quantum
+Add arrived processes to ready queue
+While processes remain:
+    If queue is empty:
+        Move time to next arrival
+    Else:
+        Remove front process
+        Execute for min(quantum, remaining time)
+        Add newly arrived processes
+        If process is complete:
+            Record completion time
+        Else:
+            Add process to queue again
+Calculate TAT and WT`,
+code:`#include <stdio.h>
+int main() {
+    int n,i,q,time=0,done=0;
+    int at[20],bt[20],rem[20],ct[20];
+    float avgWT=0,avgTAT=0;
+
+    printf("Enter number of processes: ");
+    scanf("%d",&n);
+
+    for(i=0;i<n;i++) {
+        printf("Enter AT and BT: ");
+        scanf("%d%d",&at[i],&bt[i]);
+        rem[i]=bt[i];
+    }
+
+    printf("Enter time quantum: ");
+    scanf("%d",&q);
+
+    while(done<n) {
+        int executed=0;
+
+        for(i=0;i<n;i++) {
+            if(rem[i]>0 && at[i]<=time) {
+                executed=1;
+                int run=(rem[i]<q)?rem[i]:q;
+                time+=run;
+                rem[i]-=run;
+
+                if(rem[i]==0) {
+                    ct[i]=time;
+                    done++;
+                }
+            }
+        }
+
+        if(!executed) time++;
+    }
+
+    printf("\\nCT\\tTAT\\tWT\\n");
+    for(i=0;i<n;i++) {
+        int tat=ct[i]-at[i];
+        int wt=tat-bt[i];
+        printf("%d\\t%d\\t%d\\n",ct[i],tat,wt);
+        avgTAT+=tat;
+        avgWT+=wt;
+    }
+
+    printf("Average WT = %.2f\\n",avgWT/n);
+    printf("Average TAT = %.2f\\n",avgTAT/n);
+    return 0;
+}`,
+faq:[
+["What is a time quantum?","It is the fixed maximum CPU time given to a process during one turn."],
+["Is Round Robin preemptive?","Yes. A process can be interrupted when its time quantum expires."],
+["What happens when a process is unfinished?","It is placed at the end of the ready queue."]
+]
+},
+MLFQ:{
+aim:"To demonstrate Multilevel Feedback Queue scheduling using multiple priority queues and process demotion.",
+theory:"MLFQ maintains multiple ready queues with different priority levels. New processes enter the highest-priority queue. An unfinished process moves to a lower-priority queue. This simulator uses three queues: Queue 1 uses Round Robin, Queue 2 uses Round Robin, and Queue 3 uses FCFS.",
+steps:["Start the program.","Read process arrival and burst times.","Set the time quantum for Queue 1 and Queue 2.","Insert new processes into Queue 1.","Select a process from the highest-priority non-empty queue.","Execute it using that queue's scheduling rule.","If unfinished, move it to the next lower-priority queue.","Repeat until all processes finish.","Calculate CT, TAT and WT."],
+pseudo:`Create Queue 1, Queue 2 and Queue 3
+Insert new processes into Queue 1
+While processes remain:
+    Select highest-priority non-empty queue
+    Execute process using that queue's rule
+    If process completes:
+        Record completion time
+    Else:
+        Move process to next lower queue
+Calculate CT, TAT and WT`,
+code:`/* Simplified MLFQ pseudocode in C-style form.
+   Queue 1: Round Robin
+   Queue 2: Round Robin
+   Queue 3: FCFS
+
+   1. Insert arriving processes into Queue 1.
+   2. Select the highest-priority non-empty queue.
+   3. Execute using that queue's time quantum.
+   4. If unfinished, demote the process.
+   5. If finished, record completion time.
+   6. Calculate TAT = CT - AT.
+   7. Calculate WT = TAT - BT.
+
+   A complete implementation requires ready-queue
+   data structures and arrival-event handling.
+*/`,
+faq:[
+["What is MLFQ?","MLFQ is a scheduling algorithm that uses multiple queues with different priorities."],
+["Where do new processes enter?","In this simulator, new processes enter the highest-priority Queue 1."],
+["What happens when a process is unfinished?","It is moved to the next lower-priority queue."],
+["Is this a complete general-purpose MLFQ?","No. This is a simplified three-queue demonstration without priority boosting."]
+]
+}
+};
+
+function renderLabManual(){
+  const algorithm=document.getElementById("algorithm").value;
+  const d=manualData[algorithm];
+
+  document.getElementById("labManual").innerHTML=`
+    <h3>AIM – ${algorithm}</h3>
+    <p>${d.aim}</p>
+
+    <h3>Theory</h3>
+    <p>${d.theory}</p>
+
+    <h3>Procedure</h3>
+    <ol>${d.steps.map(s=>`<li>${s}</li>`).join("")}</ol>
+
+    <h3>Pseudocode</h3>
+    <pre>${safeText(d.pseudo)}</pre>
+
+    <h3>C Program / Implementation Reference</h3>
+    <pre>${safeText(d.code)}</pre>
+
+    <h3>Sample Input</h3>
+    <pre>Number of processes: 3
+P1: AT = 0, BT = 5
+P2: AT = 1, BT = 3
+P3: AT = 2, BT = 4
+${algorithm==="RR"?"Time Quantum: 2":""}${algorithm==="MLFQ"?"Queue 1 Quantum: 2\\nQueue 2 Quantum: 4":""}</pre>
+
+    <h3>Sample Output</h3>
+    <p>Completion time, turnaround time and waiting time are calculated by the simulator based on the selected algorithm and input values. Run the simulation to view the actual output.</p>
+
+    <h3>Frequently Asked Viva Questions</h3>
+    ${d.faq.map(([q,a])=>`<p><strong>Q. ${q}</strong><br>Ans. ${a}</p>`).join("")}
+
+    <h3>Result</h3>
+    <p>Thus, the ${d.title} algorithm was demonstrated using the CPU Scheduling Simulator. The completion time, turnaround time and waiting time were calculated for the given processes.</p>
+  `;
+}
+
+changeAlgorithm();
+renderProcesses();
+</script>
+</body>
+</html>
